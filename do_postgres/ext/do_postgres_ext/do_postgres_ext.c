@@ -156,13 +156,7 @@ static VALUE parse_date(const char *date) {
 
   sscanf(date, "%4d-%2d-%2d", &year, &month, &day);
 
-  jd = jd_from_date(year, month, day);
-
-  // Math from Date.jd_to_ajd
-  ajd = jd * 2 - 1;
-  rational = rb_funcall(rb_mKernel, ID_RATIONAL, 2, INT2NUM(ajd), INT2NUM(2));
-
-  return rb_funcall(rb_cDate, ID_NEW_DATE, 3, rational, INT2NUM(0), INT2NUM(2299161));
+  return rb_funcall(rb_cDate, ID_NEW, 3, INT2NUM(year), INT2NUM(month), INT2NUM(day));
 }
 
 // Creates a Rational for use as a Timezone offset to be passed to DateTime.new!
@@ -244,34 +238,13 @@ static VALUE parse_date_time(const char *date) {
     rb_raise(ePostgresError, "Couldn't parse date: %s", date);
   }
 
-  jd = jd_from_date(year, month, day);
-
-  // Generate ajd with fractional days for the time
-  // Extracted from Date#jd_to_ajd, Date#day_fraction_to_time, and Rational#+ and #-
-  num = (hour * 1440) + (min * 24);
-
-  // Modify the numerator so when we apply the timezone everything works out
-  num -= (hour_offset * 1440) + (minute_offset * 24);
-
-  den = (24 * 1440);
-  reduce(&num, &den);
-
-  num = (num * 86400) + (sec * den);
-  den = den * 86400;
-  reduce(&num, &den);
-
-  num = (jd * den) + num;
-
-  num = num * 2;
-  num = num - den;
-  den = den * 2;
-
-  reduce(&num, &den);
-
-  ajd = rb_funcall(rb_mKernel, ID_RATIONAL, 2, rb_ull2inum(num), rb_ull2inum(den));
   offset = timezone_to_offset(hour_offset, minute_offset);
 
-  return rb_funcall(rb_cDateTime, ID_NEW_DATE, 3, ajd, offset, INT2NUM(2299161));
+  return rb_funcall(rb_cDateTime, ID_NEW, 7, INT2NUM(year),
+                                  INT2NUM(month), INT2NUM(day),
+                                  INT2NUM(hour),
+                                  INT2NUM(min),
+                                  INT2NUM(sec), offset);
 }
 
 static VALUE parse_time(const char *date) {
